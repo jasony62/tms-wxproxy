@@ -5,7 +5,7 @@ const RUNNING_LOCK_PROMISE = Symbol('running_lock_promise')
 const LOCKGETTER = Symbol('lockGetter')
 const LOCKGETTERPARAMS = Symbol('lockGetterParams')
 
-class TmsLockPromise {
+class TmsMesgLockPromise {
   constructor() {
     this.waitingPromises = []
   }
@@ -47,4 +47,4 @@ class TmsLockPromise {
   }
 }
 
-module.exports = TmsLockPromise
+module.exports = TmsMesgLockPromise

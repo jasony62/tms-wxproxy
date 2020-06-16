@@ -8,7 +8,7 @@ const CL_CONFIG = process.env.TMS_WXPROXY_MONGODB_CL_CONFIG
 const CL_TEMPLATE_MESSAGE = process.env.TMS_WXPROXY_MONGODB_CL_TEMPLATE_MESSAGE
 
 class WXProxy {
-  constructor(config, mongoClient) {
+  constructor(config, mongoClient, tmsMesgLockPromise) {
     if (config && typeof config === 'object') {
       const { appid, appsecret, _id } = config
       this.config = { appid, appsecret, _id }
@@ -19,6 +19,7 @@ class WXProxy {
       }
     }
     this.mongoClient = mongoClient
+    if (tmsMesgLockPromise && typeof tmsMesgLockPromise === 'object') this.tmsMesgLockPromise = tmsMesgLockPromise
   }
   get db() {
     return DB_NAME && this.mongoClient ? this.mongoClient.db(DB_NAME) : null
@@ -82,6 +83,7 @@ class WXProxy {
    */
   async fetchAccessToken(appid, secret) {
     const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appid}&secret=${secret}`
+    
     return axios.get(url, { adapter })
       .then((rsp) => {
         const result = rsp.data
@@ -112,12 +114,9 @@ class WXProxy {
       }
     }
 
-    TmsLockPromise.lockGetterParams = this
-    TmsLockPromise.lockGetter = function (wxproxyObj) {
-      const ObjectId = require('mongodb').ObjectId
+    const getAccessToken2 = function (wxproxyObj) {
       return new Promise(async resolve => {
         let accessToken
-
         if (wxproxyObj.clConfig && wxproxyObj.config._id) {
           const tokenObj = await wxproxyObj.clConfig.findOne({ _id: new ObjectId(wxproxyObj.config._id) }, { projection: { _id: 0, accessToken: 1 } })
           if (tokenObj) {
@@ -144,7 +143,18 @@ class WXProxy {
         return resolve(accessToken)
       })
     }
-    this.accessToken = await TmsLockPromise.wait()
+
+    const ObjectId = require('mongodb').ObjectId
+    if (this.tmsMesgLockPromise && typeof this.tmsMesgLockPromise === 'object') {
+      this.tmsMesgLockPromise.lockGetterParams = this
+      this.tmsMesgLockPromise.lockGetter = getAccessToken2
+      this.accessToken = await this.tmsMesgLockPromise.wait()
+    } else {
+      /**
+       * 重新获取token
+       */
+      this.accessToken = await getAccessToken2(this)
+    }
 
     return this.accessToken.value
   }
@@ -152,7 +162,8 @@ class WXProxy {
    * 获取微信公众号下所有模板列表
    */
   async templateList() {
-    const cmd = 'https://api.weixin.qq.com/cgi-bin/template/get_all_private_template'
+    const cmd =
+      'https://api.weixin.qq.com/cgi-bin/template/get_all_private_template'
 
     const rst = await this.httpGet(cmd)
 
