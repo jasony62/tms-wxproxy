@@ -1,25 +1,6 @@
 const axios = require('axios')
 const adapter = require('axios/lib/adapters/http')
 
-/**
- * 从微信服务端获得accessToken
- */
-function fetchAccessToken(appid, secret) {
-  const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appid}&secret=${secret}`
-  return axios.get(url, { adapter }).then((rsp) => {
-    const result = rsp.data
-    if (result.access_token) {
-      let { access_token, expires_in } = result
-      return {
-        value: access_token,
-        expireAt: parseInt(Date.now() / 1000) + expires_in,
-      }
-    } else {
-      throw Error(`请求获取access_token失败[${result.errmsg}]`)
-    }
-  })
-}
-
 const DB_NAME = process.env.TMS_WXPROXY_MONGODB_DB
 
 const CL_CONFIG = process.env.TMS_WXPROXY_MONGODB_CL_CONFIG
@@ -27,10 +8,10 @@ const CL_CONFIG = process.env.TMS_WXPROXY_MONGODB_CL_CONFIG
 const CL_TEMPLATE_MESSAGE = process.env.TMS_WXPROXY_MONGODB_CL_TEMPLATE_MESSAGE
 
 class WXProxy {
-  constructor(config, mongoClient) {
+  constructor(config, mongoClient, tmsMesgLockPromise) {
     if (config && typeof config === 'object') {
-      const { appid, appsecret, accessToken } = config
-      this.config = { appid, appsecret, accessToken }
+      const { appid, appsecret, _id } = config
+      this.config = { appid, appsecret, _id }
     } else {
       this.config = {
         appid: process.env.TMS_WXPROXY_WX_APPID,
@@ -38,6 +19,7 @@ class WXProxy {
       }
     }
     this.mongoClient = mongoClient
+    if (tmsMesgLockPromise && typeof tmsMesgLockPromise === 'object') this.tmsMesgLockPromise = tmsMesgLockPromise
   }
   get db() {
     return DB_NAME && this.mongoClient ? this.mongoClient.db(DB_NAME) : null
@@ -97,6 +79,29 @@ class WXProxy {
     })
   }
   /**
+   * 从微信服务端获得accessToken
+   */
+  async fetchAccessToken(appid, secret) {
+    const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appid}&secret=${secret}`
+
+    return axios.get(url, { adapter })
+      .then((rsp) => {
+        const result = rsp.data
+        if (result.access_token) {
+          let { access_token, expires_in } = result
+          return {
+            value: access_token,
+            expireAt: parseInt(Date.now() / 1000) + expires_in,
+          }
+        } else {
+          throw Error(`请求获取access_token失败[${result.errmsg}]`)
+        }
+      })
+      .catch((e) => {
+        throw Error(e)
+      })
+  }
+  /**
    * 获得可用的accessToken
    */
   async getAccessToken(newAccessToken) {
@@ -104,25 +109,52 @@ class WXProxy {
       if (
         this.accessToken &&
         Date.now() / 1000 < this.accessToken.expireAt - 60
-      )
+      ) {
         return this.accessToken.value
-    }
-    /**
-     * 重新获取token
-     */
-    const { appid, appsecret } = this.config
-    if (!appid || !appsecret) {
-      throw Error('微信公众号参数为空')
+      }
     }
 
-    this.accessToken = await fetchAccessToken(appid, appsecret)
+    const getAccessToken2 = function (wxproxyObj) {
+      return new Promise(async resolve => {
+        let accessToken
+        if (wxproxyObj.clConfig && wxproxyObj.config._id) {
+          const tokenObj = await wxproxyObj.clConfig.findOne({ _id: new ObjectId(wxproxyObj.config._id) }, { projection: { _id: 0, accessToken: 1 } })
+          if (tokenObj) {
+            if (tokenObj.accessToken && Date.now() / 1000 < tokenObj.accessToken.expireAt - 60) {
+              return resolve(tokenObj.accessToken)
+            }
+          }
+        }
+        /**
+         * 重新获取token
+         */
+        const { appid, appsecret } = wxproxyObj.config
+        if (!appid || !appsecret) {
+          throw Error('微信公众号参数为空')
+        }
+        accessToken = await wxproxyObj.fetchAccessToken(appid, appsecret)
+        if (wxproxyObj.clConfig && wxproxyObj.config._id) {
+          await wxproxyObj.clConfig.updateOne(
+            { _id: new ObjectId(wxproxyObj.config._id) },
+            { $set: { accessToken: accessToken } }
+          )
+        }
 
-    if (this.clConfig && this.config._id) {
-      const ObjectId = require('mongodb').ObjectId
-      this.clConfig.updateOne(
-        { _id: new ObjectId(this.config._id) },
-        { $set: { accessToken } }
-      )
+        return resolve(accessToken)
+      })
+    }
+
+    const ObjectId = require('mongodb').ObjectId
+    if (this.tmsMesgLockPromise && typeof this.tmsMesgLockPromise === 'object') {
+      this.tmsMesgLockPromise.lockGetterParams = this
+      this.tmsMesgLockPromise.lockGetter = getAccessToken2
+      this.accessToken = await this.tmsMesgLockPromise.wait()
+    } else {
+      /**
+       * 重新获取token
+       */
+      // this.accessToken = await getAccessToken2(this)
+      throw '获取access_token流程错误'
     }
 
     return this.accessToken.value
@@ -131,8 +163,7 @@ class WXProxy {
    * 获取微信公众号下所有模板列表
    */
   async templateList() {
-    const cmd =
-      'https://api.weixin.qq.com/cgi-bin/template/get_all_private_template'
+    const cmd = 'https://api.weixin.qq.com/cgi-bin/template/get_all_private_template'
 
     const rst = await this.httpGet(cmd)
 
@@ -140,8 +171,8 @@ class WXProxy {
       const { template_id, title, content, example } = tpl
       const myTpl = { template_id, title, content, example }
 
-      myTpl.params = content.match(/{{.+}}/g).map((param) => {
-        let name = param.match(/{{(.+)\./)[1]
+      myTpl.params = content.match(/{ {.+} }/g).map((param) => {
+        let name = param.match(/{ {(.+)\./)[1]
         return { name }
       })
 
