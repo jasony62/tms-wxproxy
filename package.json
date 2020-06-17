@@ -1,11 +1,12 @@
 {
   "name": "tms-wxproxy",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "微信接口。",
   "main": "index.js",
   "files": [
     "indexjs",
-    "wxproxy.js"
+    "wxproxy.js",
+    "lock-promise"
   ],
   "scripts": {
     "test": "jest"
