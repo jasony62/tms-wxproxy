@@ -83,7 +83,7 @@ class WXProxy {
    */
   async fetchAccessToken(appid, secret) {
     const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appid}&secret=${secret}`
-    
+
     return axios.get(url, { adapter })
       .then((rsp) => {
         const result = rsp.data
@@ -153,7 +153,8 @@ class WXProxy {
       /**
        * 重新获取token
        */
-      this.accessToken = await getAccessToken2(this)
+      // this.accessToken = await getAccessToken2(this)
+      throw '获取access_token流程错误'
     }
 
     return this.accessToken.value
@@ -162,8 +163,7 @@ class WXProxy {
    * 获取微信公众号下所有模板列表
    */
   async templateList() {
-    const cmd =
-      'https://api.weixin.qq.com/cgi-bin/template/get_all_private_template'
+    const cmd = 'https://api.weixin.qq.com/cgi-bin/template/get_all_private_template'
 
     const rst = await this.httpGet(cmd)
 
@@ -171,8 +171,8 @@ class WXProxy {
       const { template_id, title, content, example } = tpl
       const myTpl = { template_id, title, content, example }
 
-      myTpl.params = content.match(/{{.+}}/g).map((param) => {
-        let name = param.match(/{{(.+)\./)[1]
+      myTpl.params = content.match(/{ {.+} }/g).map((param) => {
+        let name = param.match(/{ {(.+)\./)[1]
         return { name }
       })
 
