@@ -171,8 +171,8 @@ class WXProxy {
       const { template_id, title, content, example } = tpl
       const myTpl = { template_id, title, content, example }
 
-      myTpl.params = content.match(/{ {.+} }/g).map((param) => {
-        let name = param.match(/{ {(.+)\./)[1]
+      myTpl.params = content.match(/{{.+}}/g).map((param) => {
+        let name = param.match(/{{(.+)\./)[1]
         return { name }
       })
 
