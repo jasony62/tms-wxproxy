@@ -19,7 +19,8 @@ class WXProxy {
       }
     }
     this.mongoClient = mongoClient
-    if (tmsMesgLockPromise && typeof tmsMesgLockPromise === 'object') this.tmsMesgLockPromise = tmsMesgLockPromise
+    if (tmsMesgLockPromise && typeof tmsMesgLockPromise === 'object')
+      this.tmsMesgLockPromise = tmsMesgLockPromise
   }
   get db() {
     return DB_NAME && this.mongoClient ? this.mongoClient.db(DB_NAME) : null
@@ -84,7 +85,8 @@ class WXProxy {
   async fetchAccessToken(appid, secret) {
     const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appid}&secret=${secret}`
 
-    return axios.get(url, { adapter })
+    return axios
+      .get(url, { adapter })
       .then((rsp) => {
         const result = rsp.data
         if (result.access_token) {
@@ -115,12 +117,18 @@ class WXProxy {
     }
 
     const getAccessToken2 = function (wxproxyObj) {
-      return new Promise(async resolve => {
+      return new Promise(async (resolve) => {
         let accessToken
         if (wxproxyObj.clConfig && wxproxyObj.config._id) {
-          const tokenObj = await wxproxyObj.clConfig.findOne({ _id: new ObjectId(wxproxyObj.config._id) }, { projection: { _id: 0, accessToken: 1 } })
+          const tokenObj = await wxproxyObj.clConfig.findOne(
+            { _id: new ObjectId(wxproxyObj.config._id) },
+            { projection: { _id: 0, accessToken: 1 } }
+          )
           if (tokenObj) {
-            if (tokenObj.accessToken && Date.now() / 1000 < tokenObj.accessToken.expireAt - 60) {
+            if (
+              tokenObj.accessToken &&
+              Date.now() / 1000 < tokenObj.accessToken.expireAt - 60
+            ) {
               return resolve(tokenObj.accessToken)
             }
           }
@@ -145,7 +153,10 @@ class WXProxy {
     }
 
     const ObjectId = require('mongodb').ObjectId
-    if (this.tmsMesgLockPromise && typeof this.tmsMesgLockPromise === 'object') {
+    if (
+      this.tmsMesgLockPromise &&
+      typeof this.tmsMesgLockPromise === 'object'
+    ) {
       this.tmsMesgLockPromise.lockGetterParams = this
       this.tmsMesgLockPromise.lockGetter = getAccessToken2
       this.accessToken = await this.tmsMesgLockPromise.wait()
@@ -163,18 +174,21 @@ class WXProxy {
    * 获取微信公众号下所有模板列表
    */
   async templateList() {
-    const cmd = 'https://api.weixin.qq.com/cgi-bin/template/get_all_private_template'
+    const cmd =
+      'https://api.weixin.qq.com/cgi-bin/template/get_all_private_template'
 
     const rst = await this.httpGet(cmd)
 
     const templates = rst.template_list.map((tpl) => {
       const { template_id, title, content, example } = tpl
       const myTpl = { template_id, title, content, example }
-
-      myTpl.params = content.match(/{{.+}}/g).map((param) => {
-        let name = param.match(/{{(.+)\./)[1]
-        return { name }
-      })
+      const params = content.match(/{{.+}}/g)
+      if (params)
+        myTpl.params = params.map((param) => {
+          let name = param.match(/{{(.+)\./)[1]
+          return { name }
+        })
+      else myTpl.params = []
 
       return myTpl
     })
