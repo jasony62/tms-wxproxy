@@ -1,5 +1,6 @@
 const axios = require('axios')
 const adapter = require('axios/lib/adapters/http')
+const ObjectId = require('mongodb').ObjectId
 
 const DB_NAME = process.env.TMS_WXPROXY_MONGODB_DB
 
@@ -152,7 +153,6 @@ class WXProxy {
       })
     }
 
-    const ObjectId = require('mongodb').ObjectId
     if (
       this.tmsMesgLockPromise &&
       typeof this.tmsMesgLockPromise === 'object'
@@ -165,7 +165,7 @@ class WXProxy {
        * 重新获取token
        */
       // this.accessToken = await getAccessToken2(this)
-      throw '获取access_token流程错误'
+      throw Error('获取access_token流程错误')
     }
 
     return this.accessToken.value
