@@ -49,7 +49,7 @@ class WXProxy {
     }
 
     const options = { adapter }
-    if (params && Array.isArray(params)) options.params = params
+    if (params && typeof params === "object") options.params = params
 
     return axios.get(url, options).then((rsp) => {
       const result = rsp.data
@@ -74,7 +74,7 @@ class WXProxy {
     return axios.post(url, posted, { adapter }).then((rsp) => {
       const result = rsp.data
       if (result.errcode === 40014) return this.httpPost(cmd, posted, true)
-      if (result.errcode !== 0)
+      if (typeof result.errcode !== "undefined" && result.errcode !== 0)
         throw Error(`${result.errmsg}(${result.errcode})`)
 
       return result
@@ -227,6 +227,42 @@ class WXProxy {
         }
       }
     }
+  }
+  /**
+   * 生成场景二维码
+   */
+  async qrcodeCreate(scene_id, oneOff, expire) {
+    $cmd = 'https://api.weixin.qq.com/cgi-bin/qrcode/create'
+
+    let posted
+    if (oneOff === false) {
+      posted = {
+        action_name: "QR_LIMIT_SCENE",
+        action_info: {
+          scene: { scene_id },
+        },
+      }
+    } else {
+      posted = {
+        expire_seconds: expire,
+        action_name: "QR_SCENE",
+        action_info: {
+          scene: { scene_id },
+        },
+      }
+    }
+
+    let msgid, errmsg
+    const rst = await this.httpPost(cmd, posted)
+    const pic = `https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=${rst.ticket}`
+
+    let d = {
+      scene_id,
+      pic,
+    }
+    if (oneOff) d.expire_seconds = rst.expire_seconds;
+
+    return d
   }
 }
 
