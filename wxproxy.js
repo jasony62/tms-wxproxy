@@ -232,7 +232,7 @@ class WXProxy {
    * 生成场景二维码
    */
   async qrcodeCreate(scene_id, oneOff, expire) {
-    $cmd = 'https://api.weixin.qq.com/cgi-bin/qrcode/create'
+    const cmd = 'https://api.weixin.qq.com/cgi-bin/qrcode/create'
 
     let posted
     if (oneOff === false) {
@@ -263,6 +263,27 @@ class WXProxy {
     if (oneOff) d.expire_seconds = rst.expire_seconds;
 
     return d
+  }
+  /**
+   * 获得一个指定粉丝的信息
+   */
+  async userInfo(openid, getGroup = false) {
+    const cmd = 'https://api.weixin.qq.com/cgi-bin/user/info'
+
+    let params = { openid }
+    /*user info*/
+    let userRst = await this.httpGet(cmd, params)
+    /*group info*/
+    if (getGroup) {
+      /**
+       * 获得粉丝的分组信息
+       */
+      const cmd2 = 'https://api.weixin.qq.com/cgi-bin/groups/getid'
+      const groupRst = this.httpPost(cmd2, params)
+      userRst.groupid = groupRst.groupid
+    }
+
+    return userRst
   }
 }
 
