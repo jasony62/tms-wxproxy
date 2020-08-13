@@ -1,5 +1,5 @@
-const axios = require('axios')
-const adapter = require('axios/lib/adapters/http')
+const axios = require('axios-https-proxy-fix')
+const adapter = require('axios-https-proxy-fix/lib/adapters/http')
 
 const DB_NAME = process.env.TMS_WXPROXY_MONGODB_DB
 
@@ -8,7 +8,7 @@ const CL_CONFIG = process.env.TMS_WXPROXY_MONGODB_CL_CONFIG
 const CL_TEMPLATE_MESSAGE = process.env.TMS_WXPROXY_MONGODB_CL_TEMPLATE_MESSAGE
 
 class WXProxy {
-  constructor(config, mongoClient, tmsMesgLockPromise) {
+  constructor(config, mongoClient, tmsMesgLockPromise, axiosObj = null) {
     if (config && typeof config === 'object') {
       const { appid, appsecret, _id } = config
       this.config = { appid, appsecret, _id }
@@ -19,8 +19,11 @@ class WXProxy {
       }
     }
     this.mongoClient = mongoClient
-    if (tmsMesgLockPromise && typeof tmsMesgLockPromise === 'object')
-      this.tmsMesgLockPromise = tmsMesgLockPromise
+    if (tmsMesgLockPromise && typeof tmsMesgLockPromise === 'object') this.tmsMesgLockPromise = tmsMesgLockPromise
+    //
+    if (!axiosObj) {
+      this.axios = axios.create({ adapter })
+    } else this.axios = axiosObj
   }
   get db() {
     return DB_NAME && this.mongoClient ? this.mongoClient.db(DB_NAME) : null
@@ -47,10 +50,10 @@ class WXProxy {
       url += `access_token=${token}`
     }
 
-    const options = { adapter }
+    const options = {}
     if (params && typeof params === "object") options.params = params
 
-    return axios.get(url, options).then((rsp) => {
+    return this.axios.get(url, options).then((rsp) => {
       const result = rsp.data
       if (result.errcode) {
         if (result.errcode === 40014) return this.httpGet(cmd, params, true)
@@ -70,11 +73,12 @@ class WXProxy {
     url += /\?/.test(cmd) ? '&' : '?'
     url += `access_token=${token}`
 
-    return axios.post(url, posted, { adapter }).then((rsp) => {
+    return this.axios.post(url, posted).then((rsp) => {
       const result = rsp.data
       if (result.errcode === 40014) return this.httpPost(cmd, posted, true)
-      if (typeof result.errcode !== "undefined" && result.errcode !== 0)
+      if (typeof result.errcode !== "undefined" && result.errcode !== 0) {
         throw Error(`${result.errmsg}(${result.errcode})`)
+      }
 
       return result
     })
@@ -85,8 +89,8 @@ class WXProxy {
   async fetchAccessToken(appid, secret) {
     const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appid}&secret=${secret}`
 
-    return axios
-      .get(url, { adapter })
+    return this.axios
+      .get(url)
       .then((rsp) => {
         const result = rsp.data
         if (result.access_token) {

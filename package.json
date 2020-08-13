@@ -1,6 +1,6 @@
 {
   "name": "tms-wxproxy",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "微信接口。",
   "main": "index.js",
   "files": [
@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/jasony62/tms-wxproxy#readme",
   "dependencies": {
-    "axios": "^0.19.2"
+    "axios-https-proxy-fix": "^0.17.1"
   },
   "peerDependencies": {
     "mongodb": "^3.5.8"
@@ -32,7 +32,7 @@
     "dotenv": "^8.2.0",
     "jest": "^26.0.1"
   },
-  "__npminstall_done": "Mon Jun 08 2020 11:19:00 GMT+0800 (GMT+08:00)",
-  "_from": "tms-wxproxy@0.0.3",
-  "_resolved": "https://registry.npm.taobao.org/tms-wxproxy/download/tms-wxproxy-0.0.3.tgz"
+  "__npminstall_done": "Mon Jul 27 2020 09:59:59 GMT+0800 (GMT+08:00)",
+  "_from": "tms-wxproxy@0.0.7",
+  "_resolved": "https://registry.npm.taobao.org/tms-wxproxy/download/tms-wxproxy-0.0.7.tgz"
 }
