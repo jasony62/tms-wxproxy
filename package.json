@@ -1,6 +1,6 @@
 {
   "name": "tms-wxproxy",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "description": "微信接口。",
   "main": "index.js",
   "files": [
